@@ -192,6 +192,11 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
+    // If the executable is setuid or setgid, the --reset-uid, --reset-gid, --set-uid, and --set-gid options will not work properly
+    if ((st.st_mode & S_ISUID) || (st.st_mode & S_ISGID)) {
+        fprintf(stderr, "Warning: Executable '%s' is setuid or setgid. securitywrap will not work properly.\n", executable);
+    }
+
     // If --reset-uid is specified, reset the effective UID to the real UID
     if (reset_uid) {
         if (seteuid(getuid()) == -1) {
