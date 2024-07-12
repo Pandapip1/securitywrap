@@ -128,21 +128,41 @@ int main(int argc, char *argv[]) {
         optind++;
     }
 
+    // If set UID and reset UID are both specified, throw an error (same for GID)
+    if (reset_uid && (set_uid != -1 || set_real_uid != -1)) {
+        fprintf(stderr, "Error: --set-uid and --reset-uid are mutually exclusive\n");
+        return 1;
+    }
+    if (reset_gid && (set_gid != -1 || set_real_gid != -1)) {
+        fprintf(stderr, "Error: --set-gid and --reset-gid are mutually exclusive\n");
+        return 1;
+    }
+
+    // If set real UID and reset UID are both specified, throw an error (same for GID)
+    if (reset_uid && set_real_uid != -1) {
+        fprintf(stderr, "Error: --set-real-uid and --reset-uid are mutually exclusive\n");
+        return 1;
+    }
+    if (reset_gid && set_real_gid != -1) {
+        fprintf(stderr, "Error: --set-real-gid and --reset-gid are mutually exclusive\n");
+        return 1;
+    }
+
+    // If set real UID is set but set UID is not, set UID to the real UID (same for GID)
+    if (set_real_uid != -1 && set_uid == -1) {
+        set_uid = set_real_uid;
+    }
+    if (set_real_gid != -1 && set_gid == -1) {
+        set_gid = set_real_gid;
+    }
+
     // The first argument is the executable to run
     char *executable = argv[optind];
     char **exec_args = &argv[optind];
 
     // If --reset-uid is specified, reset the effective UID to the real UID
     if (reset_uid) {
-        if (setuid(getuid()) == -1) {
-            perror("setuid");
-            return 1;
-        }
-    }
-
-    // If --set-uid <user_or_uid> is specified, set the effective UID
-    if (set_uid != -1) {
-        if (seteuid(set_uid) == -1) {
+        if (seteuid(getuid()) == -1) {
             perror("seteuid");
             return 1;
         }
@@ -156,17 +176,17 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    // If --reset-gid is specified, reset the effective GID to the real GID
-    if (reset_gid) {
-        if (setgid(getgid()) == -1) {
-            perror("setgid");
+    // If --set-uid <user_or_uid> is specified, set the effective UID
+    if (set_uid != -1) {
+        if (seteuid(set_uid) == -1) {
+            perror("seteuid");
             return 1;
         }
     }
 
-    // If --set-gid <group_or_gid> is specified, set the effective GID
-    if (set_gid != -1) {
-        if (setegid(set_gid) == -1) {
+    // If --reset-gid is specified, reset the effective GID to the real GID
+    if (reset_gid) {
+        if (setegid(getgid()) == -1) {
             perror("setegid");
             return 1;
         }
@@ -176,6 +196,14 @@ int main(int argc, char *argv[]) {
     if (set_real_gid != -1) {
         if (setgid(set_real_gid) == -1) {
             perror("setgid");
+            return 1;
+        }
+    }
+
+    // If --set-gid <group_or_gid> is specified, set the effective GID
+    if (set_gid != -1) {
+        if (setegid(set_gid) == -1) {
+            perror("setegid");
             return 1;
         }
     }
