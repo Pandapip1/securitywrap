@@ -56,6 +56,10 @@ int main(int argc, char *argv[]) {
 
     // If argv[0] is setuid or setgid root or not owned by root, this is a security vulnerability. Throw an error.
     struct stat st;
+    if (argv[0][0] != '/') {
+        fprintf(stderr, "Error: wrapper must be an absolute path\n");
+        return 1;
+    }
     if (stat(argv[0], &st) == -1) {
         perror("stat");
         return 1;
