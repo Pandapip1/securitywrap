@@ -54,7 +54,7 @@ int main(int argc, char *argv[]) {
         return 1;
     }
 
-    // If argv[0] is setuid or setgid root, this is a security vulnerability. Throw an error.
+    // If argv[0] is setuid or setgid root or not owned by root, this is a security vulnerability. Throw an error.
     struct stat st;
     if (stat(argv[0], &st) == -1) {
         perror("stat");
@@ -62,6 +62,14 @@ int main(int argc, char *argv[]) {
     }
     if ((st.st_mode & S_ISUID) || (st.st_mode & S_ISGID)) {
         fprintf(stderr, "Error: wrapper must not be setuid or setgid\n");
+        return 1;
+    }
+    if (st.st_uid != 0) {
+        fprintf(stderr, "Error: wrapper must be owned by root\n");
+        return 1;
+    }
+    if (st.st_gid != 0) {
+        fprintf(stderr, "Error: wrapper must be in the root group\n");
         return 1;
     }
 
@@ -159,6 +167,26 @@ int main(int argc, char *argv[]) {
     // The first argument is the executable to run
     char *executable = argv[optind];
     char **exec_args = &argv[optind];
+
+    // Ensure that the executable is an absolute path
+    if (executable[0] != '/') {
+        fprintf(stderr, "Error: Executable '%s' is not an absolute path\n", executable);
+        return 1;
+    }
+
+    // Ensure that the executable is owned by root
+    if (stat(executable, &st) == -1) {
+        perror("stat");
+        return 1;
+    }
+    if (st.st_uid != 0) {
+        fprintf(stderr, "Error: Executable '%s' is not owned by root\n", executable);
+        return 1;
+    }
+    if (st.st_gid != 0) {
+        fprintf(stderr, "Error: Executable '%s' is not in the root group\n", executable);
+        return 1;
+    }
 
     // If --reset-uid is specified, reset the effective UID to the real UID
     if (reset_uid) {
