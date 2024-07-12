@@ -10,7 +10,7 @@
 #include <grp.h>
 
 void print_usage(const char *program_name) {
-    fprintf(stderr, "Usage: %s [--set-uid <user_or_uid> | --set-real-uid <user_or_uid>] [--set-gid <group_or_gid> | --set-real-gid <group_or_gid>] [--reset-uid] [--reset-gid] <executable> [args...]\n", program_name);
+    fprintf(stderr, "Usage: %s [--set-uid <user_or_uid> | --reset-uid ] [--set-real-uid <user_or_uid>] [--set-gid <group_or_gid> | --reset-gid] [--set-real-gid <group_or_gid>] <executable> [args...]\n", program_name);
 }
 
 uid_t resolve_uid(const char *user_or_uid) {
