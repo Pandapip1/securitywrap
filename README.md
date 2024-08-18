@@ -7,7 +7,7 @@ Capability support coming SOON™
 ## Usage
 
 ```bash
-#!/bin/env bash
+#!/bin/sh
 exec /path/to/securitywrap [--set-uid <user_or_uid> | --reset-uid ] [--set-real-uid <user_or_uid>] [--set-gid <group_or_gid> | --reset-gid] [--set-real-gid <group_or_gid>] /path/to/application $@
 ```
 
