@@ -1,6 +1,6 @@
 # securitywrap
 
-Sometimes, you have an application that's picky about which users / groups it's being run as, and whether they match the real user id or group id. This is a simple interpreter that allows for easy wrappers to be created to ensure that the application is run as the correct user and group.
+Sometimes, you have an application that's picky about which users / groups it's being run as, and whether they match the real user id or group id. This is a simple program that allows for easy wrappers to be created to ensure that the application is run as the correct user and group.
 
 Capability support coming SOON™
 
