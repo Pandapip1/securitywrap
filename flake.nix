@@ -19,7 +19,7 @@
             nativeBuildInputs = [ pkgs.cmake ];
             meta = {
               description = "A simple tool to run a command with real and/or effective uids and/or gids";
-              license = lib.licenses.gpl3;
+              license = lib.licenses.lgpl3;
               maintainers = with lib.maintainers; [ pandapip1 ];
               mainProgram = "securitywrap";
             };
