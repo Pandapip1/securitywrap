@@ -192,8 +192,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Execute the specified executable with its arguments
-    execvp(executable, exec_args);
-    // If execvp returns, it means an error occurred
-    perror("execvp");
+    execv(executable, exec_args);
+    // If execv returns, it means an error occurred
+    perror("execv");
     exit(1);
 }
