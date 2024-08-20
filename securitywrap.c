@@ -49,7 +49,7 @@ gid_t resolve_gid(const char *group_or_gid) {
 
 int main(int argc, char *argv[]) {
     // If we aren't setuid, we can't change UIDs or GIDs. Throw an error.
-    if (getuid() != 0) {
+    if (geteuid() != 0) {
         fprintf(stderr, "Error: wrapper must be setuid root\n");
         return 1;
     }
