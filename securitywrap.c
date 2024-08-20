@@ -246,28 +246,8 @@ int main(int argc, char *argv[]) {
     }
 
     // Execute the specified executable with its arguments
-    pid_t pid = fork();
-    if (pid == -1) {
-        perror("fork");
-        return 1;
-    } else if (pid == 0) {
-        // Child process
-        execvp(executable, exec_args);
-        // If execvp returns, it means an error occurred
-        perror("execvp");
-        exit(1);
-    } else {
-        // Parent process
-        int status;
-        if (waitpid(pid, &status, 0) == -1) {
-            perror("waitpid");
-            return 1;
-        }
-        if (WIFEXITED(status)) {
-            return WEXITSTATUS(status);
-        } else {
-            fprintf(stderr, "Child process did not exit normally\n");
-            return 1;
-        }
-    }
+    execvp(executable, exec_args);
+    // If execvp returns, it means an error occurred
+    perror("execvp");
+    exit(1);
 }
