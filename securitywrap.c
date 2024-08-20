@@ -48,35 +48,6 @@ gid_t resolve_gid(const char *group_or_gid) {
 }
 
 int main(int argc, char *argv[]) {
-    // If we aren't setuid, we can't change UIDs or GIDs. Throw an error.
-    if (geteuid() != 0) {
-        fprintf(stderr, "Error: wrapper must be setuid root\n");
-        return 1;
-    }
-
-    // If argv[0] is setuid or setgid root or not owned by root, this is a security vulnerability. Throw an error.
-    struct stat st;
-    if (argv[0][0] != '/') {
-        fprintf(stderr, "Error: wrapper must be an absolute path\n");
-        return 1;
-    }
-    if (stat(argv[0], &st) == -1) {
-        perror("stat");
-        return 1;
-    }
-    if ((st.st_mode & S_ISUID) || (st.st_mode & S_ISGID)) {
-        fprintf(stderr, "Error: wrapper must not be setuid or setgid\n");
-        return 1;
-    }
-    if (st.st_uid != 0) {
-        fprintf(stderr, "Error: wrapper must be owned by root\n");
-        return 1;
-    }
-    if (st.st_gid != 0) {
-        fprintf(stderr, "Error: wrapper must be in the root group\n");
-        return 1;
-    }
-
     // Options for setting UIDs and GIDs
     uid_t set_uid = -1;
     uid_t set_real_uid = -1;
@@ -171,31 +142,6 @@ int main(int argc, char *argv[]) {
     // The first argument is the executable to run
     char *executable = argv[optind];
     char **exec_args = &argv[optind];
-
-    // Ensure that the executable is an absolute path
-    if (executable[0] != '/') {
-        fprintf(stderr, "Error: Executable '%s' is not an absolute path\n", executable);
-        return 1;
-    }
-
-    // Ensure that the executable is owned by root
-    if (stat(executable, &st) == -1) {
-        perror("stat");
-        return 1;
-    }
-    if (st.st_uid != 0) {
-        fprintf(stderr, "Error: Executable '%s' is not owned by root\n", executable);
-        return 1;
-    }
-    if (st.st_gid != 0) {
-        fprintf(stderr, "Error: Executable '%s' is not in the root group\n", executable);
-        return 1;
-    }
-
-    // If the executable is setuid or setgid, the --reset-uid, --reset-gid, --set-uid, and --set-gid options will not work properly
-    if ((st.st_mode & S_ISUID) || (st.st_mode & S_ISGID)) {
-        fprintf(stderr, "Warning: Executable '%s' is setuid or setgid. securitywrap will not work properly.\n", executable);
-    }
 
     // If --reset-uid is specified, reset the effective UID to the real UID
     if (reset_uid) {
