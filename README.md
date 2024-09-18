@@ -7,8 +7,8 @@ Capability support coming SOON™
 ## Usage
 
 ```bash
-#!/bin/sh
-exec /path/to/securitywrap [--set-uid <user_or_uid> | --reset-uid ] [--set-real-uid <user_or_uid>] [--set-gid <group_or_gid> | --reset-gid] [--set-real-gid <group_or_gid>] /path/to/application $@
+cmake . [ -DSET_UID=<user_or_uid> | -DRESET_UID=ON ] [ -DSET_REAL_UID=<user_or_uid> ] [ -DSET_GID <group_or_gid> | -DRESET_GID=ON ] [ -DSET_REAL_GID <group_or_gid> ] -DWRAP_EXECUTABLE=/path/to/application
+make
 ```
 
-The wrapper should be setuid root. The securitywrap binary should be read-only and owned by root, and MUST NOT have the setuid bit set.
+The resulting wrapper should be setuid root, and **is not portable**. It relies on `WRAP_EXECUTABLE` being available at the path specified at compile time, and on the specified group(ID)(s) / user(ID)(s) existing on the system.

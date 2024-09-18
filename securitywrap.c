@@ -1,21 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <unistd.h>
-#include <sys/wait.h>
-#include <sys/stat.h>
 #include <errno.h>
 #include <string.h>
 #include <pwd.h>
 #include <grp.h>
 
-void print_usage(const char *program_name) {
-    fprintf(stderr, "Usage: %s [--set-uid <user_or_uid> | --reset-uid ] [--set-real-uid <user_or_uid>] [--set-gid <group_or_gid> | --reset-gid] [--set-real-gid <group_or_gid>] <executable> [args...]\n", program_name);
-}
-
 uid_t resolve_uid(const char *user_or_uid) {
     char *endptr;
+    errno = 0;
     uid_t uid = strtol(user_or_uid, &endptr, 10);
+    if (errno != 0) {
+        perror("strtol");
+        exit(1);
+    }
     if (*endptr == '\0') {
         // It's a numeric UID
         return uid;
@@ -23,7 +21,7 @@ uid_t resolve_uid(const char *user_or_uid) {
         // It's a user name
         struct passwd *pw;
         if ((pw = getpwnam(user_or_uid)) == NULL) {
-            fprintf(stderr, "Error: User '%s' not found\n", user_or_uid);
+            perror("getpwnam");
             exit(1);
         }
         return pw->pw_uid;
@@ -32,7 +30,12 @@ uid_t resolve_uid(const char *user_or_uid) {
 
 gid_t resolve_gid(const char *group_or_gid) {
     char *endptr;
+    errno = 0;
     gid_t gid = strtol(group_or_gid, &endptr, 10);
+    if (errno != 0) {
+        perror("strtol");
+        exit(1);
+    }
     if (*endptr == '\0') {
         // It's a numeric GID
         return gid;
@@ -40,7 +43,7 @@ gid_t resolve_gid(const char *group_or_gid) {
         // It's a group name
         struct group *grp;
         if ((grp = getgrnam(group_or_gid)) == NULL) {
-            fprintf(stderr, "Error: Group '%s' not found\n", group_or_gid);
+            perror("getgrnam");
             exit(1);
         }
         return grp->gr_gid;
@@ -48,151 +51,78 @@ gid_t resolve_gid(const char *group_or_gid) {
 }
 
 int main(int argc, char *argv[]) {
-    // Options for setting UIDs and GIDs
-    uid_t set_uid = -1;
-    uid_t set_real_uid = -1;
-    int reset_uid = 0;
-
-    gid_t set_gid = -1;
-    gid_t set_real_gid = -1;
-    int reset_gid = 0;
-
-    // Parse options
-    int optind = 1;
-    while (true) {
-        if (optind >= argc) {
-            fprintf(stderr, "Error: Missing executable\n");
-            print_usage(argv[0]);
-            return 1;
-        }
-        char *optarg = argv[optind];
-        if (strcmp(optarg, "-h") == 0 || strcmp(optarg, "--help") == 0) {
-            print_usage(argv[0]);
-            return 0;
-        } else if (strcmp(optarg, "--set-uid") == 0) {
-            optind++;
-            if (optind >= argc) {
-                fprintf(stderr, "Error: Missing argument for --set-uid\n");
-                return 1;
-            }
-            char *user_or_uid = argv[optind];
-            set_uid = resolve_uid(user_or_uid);
-        } else if (strcmp(optarg, "--set-real-uid") == 0) {
-            optind++;
-            if (optind >= argc) {
-                fprintf(stderr, "Error: Missing argument for --set-real-uid\n");
-                return 1;
-            }
-            char *user_or_uid = argv[optind];
-            set_real_uid = resolve_uid(user_or_uid);
-        } else if (strcmp(optarg, "--reset-uid") == 0) {
-            reset_uid = 1;
-        } else if (strcmp(optarg, "--set-gid") == 0) {
-            optind++;
-            if (optind >= argc) {
-                fprintf(stderr, "Error: Missing argument for --set-gid\n");
-                return 1;
-            }
-            char *group_or_gid = argv[optind];
-            set_gid = resolve_gid(group_or_gid);
-        } else if (strcmp(optarg, "--set-real-gid") == 0) {
-            optind++;
-            if (optind >= argc) {
-                fprintf(stderr, "Error: Missing argument for --set-real-gid\n");
-                return 1;
-            }
-            char *group_or_gid = argv[optind];
-            set_real_gid = resolve_gid(group_or_gid);
-        } else if (strcmp(optarg, "--reset-gid") == 0) {
-            reset_gid = 1;
-        } else {
-            break;
-        }
-        optind++;
-    }
-
-    // If set UID and reset UID are both specified, throw an error (same for GID)
-    if (reset_uid && (set_uid != -1 || set_real_uid != -1)) {
-        fprintf(stderr, "Error: --set-uid and --reset-uid are mutually exclusive\n");
-        return 1;
-    }
-    if (reset_gid && (set_gid != -1 || set_real_gid != -1)) {
-        fprintf(stderr, "Error: --set-gid and --reset-gid are mutually exclusive\n");
-        return 1;
-    }
-
-    // If set real UID and reset UID are both specified, throw an error (same for GID)
-    if (reset_uid && set_real_uid != -1) {
-        fprintf(stderr, "Error: --set-real-uid and --reset-uid are mutually exclusive\n");
-        return 1;
-    }
-    if (reset_gid && set_real_gid != -1) {
-        fprintf(stderr, "Error: --set-real-gid and --reset-gid are mutually exclusive\n");
-        return 1;
-    }
-
-    // If set real UID is set but set UID is not, set UID to the real UID (same for GID)
-    if (set_real_uid != -1 && set_uid == -1) {
-        set_uid = set_real_uid;
-    }
-    if (set_real_gid != -1 && set_gid == -1) {
-        set_gid = set_real_gid;
-    }
-
-    // The first argument is the executable to run
-    char *executable = argv[optind];
-    char **exec_args = &argv[optind];
-
-    // If --reset-uid is specified, reset the effective UID to the real UID
-    if (reset_uid) {
+    // If RESET_UID is set, reset the effective UID to the real UID
+    #ifdef RESET_UID
+    if (RESET_UID) {
         if (seteuid(getuid()) == -1) {
             perror("seteuid");
             return 1;
         }
     }
+    #endif
 
-    // If --set-real-uid <user_or_uid> is specified, set the real UID
-    if (set_real_uid != -1) {
-        if (setuid(set_real_uid) == -1) {
-            perror("setuid");
-            return 1;
-        }
+    // If SET_REAL_UID is specified, set the real UID
+    #ifdef SET_REAL_UID
+    uid_t set_real_uid = resolve_uid(SET_REAL_UID);
+    if (setuid(set_real_uid) == -1) {
+        perror("setuid");
+        return 1;
     }
+    #endif
 
-    // If --set-uid <user_or_uid> is specified, set the effective UID
+    // If SET_UID is specified, set the effective UID
+    #ifdef SET_UID
+    uid_t set_uid = resolve_uid(SET_UID);
     if (set_uid != -1) {
         if (seteuid(set_uid) == -1) {
             perror("seteuid");
             return 1;
         }
     }
+    #endif
 
-    // If --reset-gid is specified, reset the effective GID to the real GID
-    if (reset_gid) {
+    // If RESET_GID is set, reset the effective GID to the real GID
+    #ifdef RESET_GID
+    if (RESET_GID) {
         if (setegid(getgid()) == -1) {
             perror("setegid");
             return 1;
         }
     }
+    #endif
 
-    // If --set-real-gid <group_or_gid> is specified, set the real GID
+    // If SET_REAL_GID is specified, set the real GID
+    #ifdef SET_REAL_GID
+    gid_t set_real_gid = resolve_gid(SET_REAL_GID);
     if (set_real_gid != -1) {
         if (setgid(set_real_gid) == -1) {
             perror("setgid");
             return 1;
         }
     }
+    #endif
 
-    // If --set-gid <group_or_gid> is specified, set the effective GID
+    // If SET_GID is specified, set the effective GID
+    #ifdef SET_GID
+    gid_t set_gid = resolve_gid(SET_GID);
     if (set_gid != -1) {
         if (setegid(set_gid) == -1) {
             perror("setegid");
             return 1;
         }
     }
+    #endif
+
+    // Copy argv into a new array with an additional NULL element and with argv[0] replaced with WRAP_EXECUTABLE
+    char *argv_nullterm[argc + 1];
+    argv_nullterm[0] = WRAP_EXECUTABLE;
+    for (int i = 1; i < argc; i++) {
+        argv_nullterm[i] = argv[i];
+    }
+    argv_nullterm[argc] = NULL;
 
     // Execute the specified executable with its arguments
-    execv(executable, exec_args);
+    execv(WRAP_EXECUTABLE, argv_nullterm);
     // If execv returns, it means an error occurred
     perror("execv");
     exit(1);
