@@ -6,6 +6,10 @@
 #include <pwd.h>
 #include <grp.h>
 
+// Skip the setreuid/setregid calls if they are not needed, to avoid unnecessary system calls and potential errors
+#define DO_SETREUID (defined(SET_UID) || (defined(RESET_UID) && RESET_UID != 0) || defined(SET_REAL_UID))
+#define DO_SETREGID (defined(SET_GID) || (defined(RESET_GID) && RESET_GID != 0) || defined(SET_REAL_GID))
+
 uid_t resolve_uid(const char *user_or_uid) {
     char *endptr;
     errno = 0;
@@ -51,66 +55,55 @@ gid_t resolve_gid(const char *group_or_gid) {
 }
 
 int main(int argc, char *argv[]) {
-    // If RESET_UID is set, reset the effective UID to the real UID
-    #ifdef RESET_UID
-    if (RESET_UID) {
-        if (seteuid(getuid()) == -1) {
-            perror("seteuid");
-            return 1;
-        }
-    }
+    #if DO_SETREUID
+
+    // Calculate the new effective UID
+    #if defined(RESET_UID) && RESET_UID != 0
+    uid_t set_uid = getuid();
+    #elif defined(SET_UID)
+    uid_t set_uid = resolve_uid(SET_UID);
+    #else
+    uid_t set_uid = geteuid();
     #endif
 
-    // If SET_REAL_UID is specified, set the real UID
+    // Calculate the new real UID
     #ifdef SET_REAL_UID
     uid_t set_real_uid = resolve_uid(SET_REAL_UID);
-    if (setuid(set_real_uid) == -1) {
-        perror("setuid");
+    #else
+    uid_t set_real_uid = getuid();
+    #endif
+
+    if (setreuid(set_real_uid, set_uid) == -1) {
+        perror("setreuid");
         return 1;
     }
+
     #endif
 
-    // If SET_UID is specified, set the effective UID
-    #ifdef SET_UID
-    uid_t set_uid = resolve_uid(SET_UID);
-    if (set_uid != -1) {
-        if (seteuid(set_uid) == -1) {
-            perror("seteuid");
-            return 1;
-        }
-    }
+    #if DO_SETREGID
+
+    // Calculate the new effective GID
+    #if defined(RESET_GID) && RESET_GID != 0
+    gid_t set_gid = getgid();
+    #elif defined(SET_GID)
+    gid_t set_gid = resolve_gid(SET_GID);
+    #else
+    gid_t set_gid = getegid();
     #endif
 
-    // If RESET_GID is set, reset the effective GID to the real GID
-    #ifdef RESET_GID
-    if (RESET_GID) {
-        if (setegid(getgid()) == -1) {
-            perror("setegid");
-            return 1;
-        }
-    }
-    #endif
-
-    // If SET_REAL_GID is specified, set the real GID
+    // Calculate the new real GID
     #ifdef SET_REAL_GID
     gid_t set_real_gid = resolve_gid(SET_REAL_GID);
-    if (set_real_gid != -1) {
-        if (setgid(set_real_gid) == -1) {
-            perror("setgid");
-            return 1;
-        }
-    }
+    #else
+    gid_t set_real_gid = getgid();
     #endif
 
-    // If SET_GID is specified, set the effective GID
-    #ifdef SET_GID
-    gid_t set_gid = resolve_gid(SET_GID);
-    if (set_gid != -1) {
-        if (setegid(set_gid) == -1) {
-            perror("setegid");
-            return 1;
-        }
+    // Set the new GIDs
+    if (setregid(set_real_gid, set_gid) == -1) {
+        perror("setregid");
+        return 1;
     }
+
     #endif
 
     // Copy argv into a new array with an additional NULL element and with argv[0] replaced with WRAP_EXECUTABLE
